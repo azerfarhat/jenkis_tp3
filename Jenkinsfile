@@ -12,7 +12,7 @@ pipeline {
         stage('Étape 1 : Vérification du dépôt') {
             steps {
                 bat 'echo === Étape 1 : Vérification du dépôt ==='
-                bat 'git status'
+                bat '"C:\\Program Files\\Git\\bin\\git.exe" status'
             }
         }
 
