@@ -1,0 +1,6 @@
+services:
+  web:
+    image: azerfarhat/tpdevops:latest   # ton image sur Docker Hub
+    ports:
+      - "8085:80"                      # le port 8085 local redirige vers 80 du conteneur
+    restart: unless-stopped
