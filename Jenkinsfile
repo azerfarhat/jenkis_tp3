@@ -2,6 +2,11 @@ pipeline {
     agent any
     options { timestamps() }
 
+    environment {
+        IMAGE = 'azerfarhat/tpdevops'   // Nom de ton image Docker Hub
+        TAG = "build-${env.BUILD_NUMBER}"
+    }
+
     stages {
         stage('Cloner le dépôt') {
             steps {
@@ -9,37 +14,65 @@ pipeline {
             }
         }
 
-        stage('Étape 1 : Vérification du dépôt') {
+        stage('Vérification du dépôt') {
             steps {
-                bat 'echo === Étape 1 : Vérification du dépôt ==='
+                bat 'echo === Vérification du dépôt ==='
                 bat '"C:\\Program Files\\Git\\bin\\git.exe" status'
             }
         }
 
-        stage('Étape 2 : Afficher le contenu du projet') {
+        stage('Afficher le contenu du projet') {
             steps {
-                bat 'echo === Étape 2 : Afficher le contenu du projet ==='
+                bat 'echo === Contenu du projet ==='
                 bat 'dir'
             }
         }
 
-        stage('Étape 3 : Simuler un déploiement local') {
+        stage('Docker Build') {
             steps {
-                bat 'echo === Étape 3 : Simuler un déploiement local ==='
-                bat 'echo Le fichier index.html est prêt à être affiché'
+                bat 'echo === Étape : Construction de l\'image Docker ==='
+                bat 'docker version'
+                bat "docker build -t %IMAGE%:%TAG% ."
             }
         }
 
-        stage('Étape 4 : Fin du build') {
+        stage('Smoke Test (test rapide)') {
             steps {
-                bat 'echo === Étape 4 : Fin du build ==='
-                bat 'echo SUCCESS'
+                bat 'echo === Étape : Test rapide de l\'image ==='
+                bat """
+                docker rm -f monapp_test 2>nul || ver > nul
+                docker run -d --name monapp_test -p 8085:80 %IMAGE%:%TAG%
+                ping -n 5 127.0.0.1 > nul
+                curl -I http://localhost:8085 | find "200 OK"
+                docker rm -f monapp_test
+                """
+            }
+        }
+
+        stage('Push vers Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS')]) {
+                    bat """
+                    echo %PASS% | docker login -u %USER% --password-stdin
+                    docker tag %IMAGE%:%TAG% %IMAGE%:latest
+                    docker push %IMAGE%:%TAG%
+                    docker push %IMAGE%:latest
+                    """
+                }
+            }
+        }
+
+        stage('Fin du pipeline') {
+            steps {
+                bat 'echo === Pipeline terminé avec succès ==='
             }
         }
     }
 
     post {
-        success { echo 'Build OK' }
-        failure { echo 'Build KO' }
+        success { echo '✅ Build + Test + Push OK' }
+        failure { echo '❌ Échec du pipeline' }
     }
 }
